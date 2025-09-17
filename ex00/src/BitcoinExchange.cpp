@@ -6,7 +6,6 @@
 #include <limits>
 #include <sstream>
 
-
 const std::string &BitcoinExchange::getCsvPath() const
 {
 	return (_csvPath);
@@ -19,16 +18,40 @@ BitcoinExchange::BitcoinExchange(const std::string &csvPath)
 
 void BitcoinExchange::loadCsv(const std::string &csvPath)
 {
+	bool	firstLine;
+	float	value;
+
 	std::ifstream file(csvPath);
 	std::string line;
+	firstLine = true;
 	while (std::getline(file, line))
 	{
+		// Skip header if present
+		if (firstLine && line.find("date") != std::string::npos)
+		{
+			firstLine = false;
+			continue ;
+		}
+		firstLine = false;
 		std::size_t delimiter = line.find(",");
 		if (delimiter != std::string::npos)
 		{
 			std::string key = line.substr(0, delimiter);
 			std::string valueStr = line.substr(delimiter + 1);
-			_dataMap[key] = std::stof(valueStr);
+			// trim spaces
+			while (!valueStr.empty() && std::isspace(valueStr.front()))
+				valueStr.erase(0, 1);
+			while (!valueStr.empty() && std::isspace(valueStr.back()))
+				valueStr.pop_back();
+			try
+			{
+				value = std::stof(valueStr);
+				_dataMap[key] = value;
+			}
+			catch (const std::exception &e)
+			{
+				std::cerr << "Error: invalid rate in CSV => " << valueStr << std::endl;
+			}
 		}
 	}
 }

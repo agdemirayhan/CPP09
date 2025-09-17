@@ -1,7 +1,15 @@
 #include "../include/BitcoinExchange.hpp"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
+
+static std::string trim(const std::string &s) {
+    std::string::size_type b = 0, e = s.size();
+    while (b < e && (s[b] == ' ' || s[b] == '\t')) ++b;
+    while (e > b && (s[e-1] == ' ' || s[e-1] == '\t')) --e;
+    return s.substr(b, e - b);
+}
 
 // static bool	parseInputLine(const std::string &line, std::string &date,
 // 		double &value)
@@ -46,6 +54,7 @@ int	main(int argc, char **argv)
 {
 	double	value;
 	double	result;
+	bool	firstLine;
 
 	if (argc != 2)
 	{
@@ -55,22 +64,44 @@ int	main(int argc, char **argv)
 	try
 	{
 		BitcoinExchange be("data/data.csv");
-		// std::ifstream in(be.getCsvPath().c_str());
-		// std::cout << "CSV path: " << be.getCsvPath() << std::endl;
-		// if (!in)
+		// // TEST: _dataMap içeriğini yazdır
+		// std::cout << "---- CSV'den okunan veriler ----" << std::endl;
+		// for (std::map<std::string,
+		// 	float>::const_iterator it = be.getDataMap().begin(); it != be.getDataMap().end(); ++it)
 		// {
-		// 	std::cerr << "Error: could not open file." << std::endl;
-		// 	return (1);
+		// 	std::cout << it->first << " => " << it->second << std::endl;
 		// }
-		// std::cout << "CSV opened OK\n";
-		// std::string line;
-		// while (std::getline(in, line))
-		// {
-		// 	std::size_t delimiter = line.find(",");
-		// 	if (delimiter != std::string::npos)
-		// 		_dataMap[line.substr(0,
-		// 				delimiter)] = std::stof(line.substr(delimiter + 1));
-		// }
+		// std::cout << "--------------------------------" << std::endl;
+		 std::ifstream in(argv[1]);
+        if (!in) {
+            std::cerr << "Error: could not open file." << std::endl;
+            return 1;
+        }
+
+        std::string line;
+        bool firstLine = true;
+
+        while (std::getline(in, line)) {
+            if (line.empty()) continue;
+
+            // header satırını atla
+            if (firstLine && line.find("date") != std::string::npos) {
+                firstLine = false;
+                continue;
+            }
+            firstLine = false;
+
+            std::size_t bar = line.find('|');
+            if (bar == std::string::npos) {
+                std::cerr << "Error: bad input => " << line << std::endl;
+                continue;
+            }
+
+            std::string date = trim(line.substr(0, bar));
+            std::string valueStr = trim(line.substr(bar + 1));
+
+            std::cout << "Date: [" << date << "], Value: [" << valueStr << "]" << std::endl;
+        }
 		return (0);
 	}
 	catch (const std::exception &e)

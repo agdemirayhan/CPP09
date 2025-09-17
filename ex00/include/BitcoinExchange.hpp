@@ -10,6 +10,10 @@ class BitcoinExchange
   public:
 	explicit BitcoinExchange(const std::string &csvPath);
 	const std::string &getCsvPath() const;
+	const std::map<std::string, float> &getDataMap() const
+	{
+		return (_dataMap);
+	}
 
 	// double evaluate(const std::string &date, double value) const;
 
