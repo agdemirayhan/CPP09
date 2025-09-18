@@ -56,6 +56,44 @@ void BitcoinExchange::loadCsv(const std::string &csvPath)
 	}
 }
 
+bool BitcoinExchange::isLeap(int y)
+{
+    return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+}
+
+bool BitcoinExchange::isValidDate(const std::string &d)
+{
+    // YYYY-MM-DD formatı
+    if (d.size() != 10 || d[4] != '-' || d[7] != '-')
+        return false;
+    for (size_t i = 0; i < d.size(); ++i) {
+        if (i == 4 || i == 7) continue;
+        if (!std::isdigit(static_cast<unsigned char>(d[i])))
+            return false;
+    }
+
+    int y = std::atoi(d.substr(0, 4).c_str());
+    int m = std::atoi(d.substr(5, 2).c_str());
+    int day = std::atoi(d.substr(8, 2).c_str());
+
+    if (y < 2009)            // proje için makul alt sınır
+        return false;
+    if (m < 1 || m > 12)
+        return false;
+
+    int mdays[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    int maxd = mdays[m - 1];
+    if (m == 2 && isLeap(y))
+        maxd = 29;
+
+    if (day < 1 || day > maxd)
+        return false;
+
+    return true;
+}
+
+
+
 // BitcoinExchange::BitcoinExchange(const std::string &csvPath)
 // {
 // 	loadCsv(csvPath);

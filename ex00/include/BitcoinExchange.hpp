@@ -14,13 +14,14 @@ class BitcoinExchange
 	{
 		return (_dataMap);
 	}
-
+	static bool isValidDate(const std::string &d);
 	// double evaluate(const std::string &date, double value) const;
 
 	// static bool isValidDate(const std::string &date);
 
 	// static bool parseDouble(const std::string &s, double &out);
   private:
+	static bool isLeap(int y);
 	std::map<std::string, float> _dataMap;
 	void loadCsv(const std::string &csvPath);
 	std::string _csvPath; // constructor ile set edilen yol

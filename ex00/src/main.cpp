@@ -98,9 +98,29 @@ int	main(int argc, char **argv)
             }
 
             std::string date = trim(line.substr(0, bar));
+			if (!BitcoinExchange::isValidDate(date)) 
+			{
+				std::cerr << "Error: bad input => " << date << std::endl;
+				continue;
+			}
             std::string valueStr = trim(line.substr(bar + 1));
 
-            std::cout << "Date: [" << date << "], Value: [" << valueStr << "]" << std::endl;
+			// valueStr'yi double'a çevir
+			std::istringstream iss(valueStr);
+			double value;
+			if (!(iss >> value)) {
+				std::cerr << "Error: bad value => " << valueStr << std::endl;
+				continue;
+			}
+			if (value < 0) {
+				std::cerr << "Error: not a positive number." << std::endl;
+				continue;
+			}
+			if (value > 1000) {
+				std::cerr << "Error: too large a number." << std::endl;
+				continue;
+			}
+			std::cout << "Date: [" << date << "], Value: " << value << std::endl;
         }
 		return (0);
 	}
