@@ -5,14 +5,13 @@
 
 class RPN {
 public:
-    // Hata durumunda exception fırlatır
     static long long evaluate(const std::string& expr);
 
 private:
-    RPN(); // nesne üretme yok
+    RPN();
     RPN(const RPN&);
     RPN& operator=(const RPN&);
     ~RPN();
 };
 
-#endif // RPN_HPP
+#endif
