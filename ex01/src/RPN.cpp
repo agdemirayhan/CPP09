@@ -3,6 +3,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cctype>
+#include <iostream>
 
 RPN::RPN() {}
 RPN::RPN(const RPN&) {}
@@ -39,7 +40,6 @@ long long RPN::evaluate(const std::string& expr) {
             long long a = st.top(); st.pop();
             st.push(applyOp(a, b, token[0]));
         } else {
-            // sadece tek haneli sayılar kabul
             if (token.size() != 1 || !std::isdigit(token[0]))
                 throw std::runtime_error("invalid token");
             st.push(token[0] - '0');
