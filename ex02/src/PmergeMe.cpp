@@ -17,98 +17,6 @@ static void debugPrint(const char* label, const std::vector<int>& v) {
 
 namespace
 {
-inline void	insertSmallBeforeBig(std::vector<int> &chain, int small, int big)
-{
-	std::vector<int>::iterator limit = std::lower_bound(chain.begin(),
-			chain.end(), big);
-	std::vector<int>::iterator pos = std::lower_bound(chain.begin(), limit,
-			small);
-	chain.insert(pos, small);
-}
-} // namespace
-
-namespace {
-    void fj_pair_phase_vector(const std::vector<int>& in,
-                              std::vector< std::pair<int,int> >& pairs,
-                              bool& hasStraggler,
-                              int&  stragglerValue)
-    {
-        pairs.clear();
-        hasStraggler   = false;
-        stragglerValue = 0;
-
-        const size_t n = in.size();
-        pairs.reserve(n / 2);
-
-        size_t i = 0;
-        for (; i + 1 < n; i += 2) {
-            int a = in[i];
-            int b = in[i + 1];
-            if (a >= b) pairs.push_back(std::make_pair(a, b)); // (big, small)
-            else        pairs.push_back(std::make_pair(b, a));
-        }
-        if (i < n) { // tek artan
-            hasStraggler   = true;
-            stragglerValue = in[i];
-        }
-        std::cout << "[DEBUG] Pairs (big,small): ";
-        for (size_t k = 0; k < pairs.size(); ++k) {
-            std::cout << "(" << pairs[k].first << "," << pairs[k].second << ") ";
-        }
-        if (hasStraggler) std::cout << " stray=" << stragglerValue;
-        std::cout << std::endl;
-    }
-}
-
-namespace {
-    // Girdi: (big,small) listesi; Çıktı: big’lerin sıralı hâli (backbone)
-    void fj_build_backbone_vector(const std::vector< std::pair<int,int> >& pairs,
-                                  std::vector<int>& backbone)
-    {
-        const size_t m = pairs.size();
-        if (m == 0) { backbone.clear(); return; }
-        if (m == 1) { backbone.assign(1, pairs[0].first); return; }
-
-        // 1) big’leri çek
-        std::vector<int> bigs;
-        bigs.reserve(m);
-        for (size_t k = 0; k < m; ++k) bigs.push_back(pairs[k].first);
-
-        // 2) bigs’i Ford–Johnson ile sırala (özyinelemeli)
-        //    Not: Henüz small eklemiyoruz; “saf big” sıralaması istiyoruz.
-        //    Bunun için aynı “pairleme→bigs→…” sürecini bigs üzerinde uygularız.
-        //    bigs tek başına bir dizi olduğu için önce onu çiftleyip yeni pairs oluşturacağız.
-        std::vector< std::pair<int,int> > pairs2;
-        bool hasStr; int stray;
-        fj_pair_phase_vector(bigs, pairs2, hasStr, stray);
-
-        // Backbone’u derinlemesine üret
-        std::vector<int> bbChild;
-        if (!pairs2.empty())
-            fj_build_backbone_vector(pairs2, bbChild);
-        else
-            bbChild.clear();
-
-        // bbChild şu an bigs’in backbone’u (sıralı büyükler).
-        // Eğer stray (tek artan) varsa, sadece big’lerden oluşan zincire
-        // ikili arama ile eklemek gerekir; ama backbone saf “bigs” sırasını temsil ettiğinden,
-        // şimdilik basitçe uygun yere yerleştirelim.
-        std::vector<int> chain = bbChild;
-        if (hasStr) {
-            // basit lineer yerleştirme (n küçükken sorun değil; performans kritik değil)
-            std::vector<int>::iterator it = chain.begin();
-            while (it != chain.end() && *it < stray) ++it;
-            chain.insert(it, stray);
-        }
-
-        backbone.swap(chain);
-        debugPrint("[DEBUG] Backbone built", backbone);
-
-    }
-}
-
-namespace
-{
 std::vector<size_t> buildJacobsthalOrder(size_t m)
 {
 	size_t	from;
@@ -166,6 +74,108 @@ std::vector<size_t> buildJacobsthalOrder(size_t m)
 }
 } // namespace
 
+
+namespace
+{
+inline void	insertSmallBeforeBig(std::vector<int> &chain, int small, int big)
+{
+	std::vector<int>::iterator limit = std::lower_bound(chain.begin(),
+			chain.end(), big);
+	std::vector<int>::iterator pos = std::lower_bound(chain.begin(), limit,
+			small);
+	chain.insert(pos, small);
+}
+} // namespace
+
+namespace {
+    void fj_pair_phase_vector(const std::vector<int>& in,
+                              std::vector< std::pair<int,int> >& pairs,
+                              bool& hasStraggler,
+                              int&  stragglerValue)
+    {
+        pairs.clear();
+        hasStraggler   = false;
+        stragglerValue = 0;
+
+        const size_t n = in.size();
+        pairs.reserve(n / 2);
+
+        size_t i = 0;
+        for (; i + 1 < n; i += 2) {
+            int a = in[i];
+            int b = in[i + 1];
+            if (a >= b) pairs.push_back(std::make_pair(a, b)); // (big, small)
+            else        pairs.push_back(std::make_pair(b, a));
+        }
+        if (i < n) { // tek artan
+            hasStraggler   = true;
+            stragglerValue = in[i];
+        }
+        std::cout << "[DEBUG] Pairs (big,small): ";
+        for (size_t k = 0; k < pairs.size(); ++k) {
+            std::cout << "(" << pairs[k].first << "," << pairs[k].second << ") ";
+        }
+        if (hasStraggler) std::cout << " stray=" << stragglerValue;
+        std::cout << std::endl;
+    }
+}
+
+namespace {
+    // Girdi: (big,small) listesi; Çıktı: big’lerin TAM sıralı backbone’u
+    void fj_build_backbone_vector(const std::vector< std::pair<int,int> >& pairs,
+                                  std::vector<int>& backbone)
+    {
+        const size_t m = pairs.size();
+        if (m == 0) { backbone.clear(); return; }
+        if (m == 1) { backbone.assign(1, pairs[0].first); return; }
+
+        // 1) bigs dizisini çıkar
+        std::vector<int> bigs; bigs.reserve(m);
+        for (size_t k = 0; k < m; ++k) bigs.push_back(pairs[k].first);
+
+        // 2) bigs’i pairle
+        std::vector< std::pair<int,int> > pairs2;
+        bool hasStr = false; int stray = 0;
+        fj_pair_phase_vector(bigs, pairs2, hasStr, stray); // (BigOfBig, SmallOfBig)
+
+        // 3) pairs2’nin big’lerinden çocuk backbone’u özyinelemeyle üret
+        std::vector<int> bbChild;
+        if (!pairs2.empty())
+            fj_build_backbone_vector(pairs2, bbChild);
+        else
+            bbChild.clear();
+
+        // 4) Çocuk backbone üzerine pairs2’nin SMALL’larını Jacobsthal sırasıyla ekle
+        std::vector<int> chain = bbChild;
+        const size_t m2 = pairs2.size();
+        std::vector<size_t> order = buildJacobsthalOrder(m2);
+        for (size_t t = 0; t < order.size(); ++t) {
+            size_t idx   = order[t] - 1; // 1-based → 0-based
+            int bigBOB   = pairs2[idx].first;   // bu seviyenin "big of big"
+            int smallBOB = pairs2[idx].second;  // bu seviyenin "small of big"
+
+            // smallBOB’u, bigBOB’un ilk konumuna kadar ikili aramayla yerleştir
+            std::vector<int>::iterator limit = std::lower_bound(chain.begin(), chain.end(), bigBOB);
+            std::vector<int>::iterator pos   = std::lower_bound(chain.begin(), limit, smallBOB);
+            chain.insert(pos, smallBOB);
+        }
+
+        // 5) Eğer bigs tek sayıda ise stray big’i de genel backbone’a ekle
+        if (hasStr) {
+            std::vector<int>::iterator pos = std::lower_bound(chain.begin(), chain.end(), stray);
+            chain.insert(pos, stray);
+        }
+
+        // 6) Sonuç: tüm BIG’lerden oluşan sıralı backbone
+        backbone.swap(chain);
+
+        // (Opsiyonel debug)
+        // debugPrint("[DEBUG] Backbone built", backbone);
+    }
+}
+
+
+
 long PmergeMe::sortWithVector(const std::vector<int>& input, std::vector<int>& output) {
     // Adım 1: pairleme
     std::vector< std::pair<int,int> > pairs;
@@ -196,7 +206,10 @@ long PmergeMe::sortWithVector(const std::vector<int>& input, std::vector<int>& o
         debugPrint("   chain now", chain);
     }
     
-
+    std::vector<int> dbg_bigs;
+    dbg_bigs.reserve(pairs.size());
+    for (size_t i = 0; i < pairs.size(); ++i) dbg_bigs.push_back(pairs[i].first);
+    debugPrint("[DEBUG] bigs", dbg_bigs);
 
     // !!! DİKKAT: Straggler henüz eklenmedi. Bir sonraki adımda ekleyeceğiz.
     // Şimdilik kullanıcı çıktısını bozmayalım:
