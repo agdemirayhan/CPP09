@@ -1,111 +1,164 @@
 #include "../include/BitcoinExchange.hpp"
+#include <algorithm>
+#include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
-#include <sstream>
+#include <map>
 #include <string>
+#include <string_view>
 
-static std::string trim(const std::string &s) {
-    std::string::size_type b = 0, e = s.size();
-    while (b < e && (s[b] == ' ' || s[b] == '\t')) ++b;
-    while (e > b && (s[e-1] == ' ' || s[e-1] == '\t')) --e;
-    return s.substr(b, e - b);
+// ---------- trimming helpers (C++17 string_view) ----------
+static std::string_view ltrim(std::string_view sv) {
+    auto it = std::find_if_not(sv.begin(), sv.end(),
+        [](unsigned char c){ return std::isspace(c); });
+    return std::string_view(&*it, sv.end() - it);
+}
+static std::string_view rtrim(std::string_view sv) {
+    auto it = std::find_if_not(sv.rbegin(), sv.rend(),
+        [](unsigned char c){ return std::isspace(c); }).base();
+    return std::string_view(sv.data(), it - sv.begin());
+}
+static std::string_view trim_view(std::string_view sv) {
+    return rtrim(ltrim(sv));
+}
+static std::string trim_copy(std::string_view sv) {
+    std::string_view tv = trim_view(sv);
+    return std::string(tv.data(), tv.size());
 }
 
-int	main(int argc, char **argv)
-{
-	double	value;
-	double	result;
-	bool	firstLine;
+// ---------- small helpers ----------
+static bool isHeaderLine(const std::string& line) {
+    return line.find("date") != std::string::npos && line.find("value") != std::string::npos;
+}
 
-	if (argc != 2)
-	{
-		std::cerr << "Error: could not open file." << std::endl;
-		return (1);
-	}
-	try
-	{
-		BitcoinExchange be("data/data.csv");
-		std::ifstream in(argv[1]);
+static bool splitInputLine(const std::string& line, std::string& dateOut, std::string& valueOut) {
+    std::size_t bar = line.find('|');
+    if (bar == std::string::npos) return false;
+    dateOut  = trim_copy(std::string_view(line).substr(0, bar));
+    valueOut = trim_copy(std::string_view(line).substr(bar + 1));
+    return true;
+}
+
+static bool parseValue(const std::string& valueStr, double& valueOut) {
+    try {
+        std::size_t idx = 0;
+        double v = std::stod(valueStr, &idx);
+        // allow trailing spaces only
+        for (; idx < valueStr.size(); ++idx) {
+            if (!std::isspace(static_cast<unsigned char>(valueStr[idx])))
+                return false;
+        }
+        valueOut = v;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+static bool validateValue(double v) {
+    if (v < 0) {
+        std::cerr << "Error: not a positive number." << std::endl;
+        return false;
+    }
+    if (v > 1000) {
+        std::cerr << "Error: too large a number." << std::endl;
+        return false;
+    }
+    return true;
+}
+
+static bool findRateForDate(const std::map<std::string,float>& rates,
+                            const std::string& date, float& rateOut)
+{
+    if (rates.empty()) {
+        std::cerr << "Error: csv is empty or unreadable." << std::endl;
+        return false;
+    }
+
+    auto it = rates.lower_bound(date);
+    if (it == rates.end()) {
+        // date is greater than all keys -> use last record
+        --it;
+    } else if (it->first != date) {
+        // not an exact match -> use previous (<= date)
+        if (it == rates.begin()) {
+            std::cerr << "Error: no earlier rate for " << date << std::endl;
+            return false;
+        }
+        --it;
+    }
+    rateOut = it->second;
+    return true;
+}
+
+static void processInputStream(BitcoinExchange& be, std::istream& in)
+{
+    std::cout << std::fixed << std::setprecision(2);
+
+    std::string line;
+    bool firstLine = true;
+
+    const std::map<std::string,float>& rates = be.getDataMap();
+
+    while (std::getline(in, line)) {
+        if (line.empty()) continue;
+
+        // skip header once
+        if (firstLine && isHeaderLine(line)) {
+            firstLine = false;
+            continue;
+        }
+        firstLine = false;
+
+        std::string date, valueStr;
+        if (!splitInputLine(line, date, valueStr)) {
+            std::cerr << "Error: bad input => " << line << std::endl;
+            continue;
+        }
+
+        if (!BitcoinExchange::isValidDate(date)) {
+            std::cerr << "Error: bad input => " << date << std::endl;
+            continue;
+        }
+
+        double value = 0.0;
+        if (!parseValue(valueStr, value)) {
+            std::cerr << "Error: bad value => " << valueStr << std::endl;
+            continue;
+        }
+        if (!validateValue(value)) continue;
+
+        float rate = 0.0f;
+        if (!findRateForDate(rates, date, rate)) continue;
+
+        double result = value * rate;
+        std::cout << date << " => " << value << " = " << result << std::endl;
+    }
+}
+
+// ---------- main ----------
+int main(int argc, char** argv)
+{
+    if (argc != 2) {
+        std::cerr << "Error: could not open file." << std::endl;
+        return 1;
+    }
+
+    try {
+        BitcoinExchange be("data/data.csv");
+
+        std::ifstream in(argv[1]);
         if (!in) {
             std::cerr << "Error: could not open file." << std::endl;
             return 1;
         }
 
-        std::string line;
-        bool firstLine = true;
-
-       while (std::getline(in, line)) {
-    if (line.empty()) continue;
-
-    // header'ı atla
-    if (firstLine && line.find("date") != std::string::npos) {
-        firstLine = false;
-        continue;
+        processInputStream(be, in);
+        return 0;
     }
-    firstLine = false;
-
-    // "date | value" ayır
-    std::size_t bar = line.find('|');
-    if (bar == std::string::npos) {
-        std::cerr << "Error: bad input => " << line << std::endl;
-        continue;
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
     }
-
-    std::string date = trim(line.substr(0, bar));
-    std::string valueStr = trim(line.substr(bar + 1));
-
-    // tarih geçerli mi?
-    if (!BitcoinExchange::isValidDate(date)) {
-        std::cerr << "Error: bad input => " << date << std::endl;
-        continue;
-    }
-
-    // value'yu sayıya çevir
-    std::istringstream iss(valueStr);
-    double value;
-    if (!(iss >> value) || (iss.peek() != EOF && !std::isspace(iss.peek()))) {
-        std::cerr << "Error: bad value => " << valueStr << std::endl;
-        continue;
-    }
-    if (value < 0) {
-        std::cerr << "Error: not a positive number." << std::endl;
-        continue;
-    }
-    if (value > 1000) {
-        std::cerr << "Error: too large a number." << std::endl;
-        continue;
-    }
-
-    // map'te tarih için <= en yakın anahtarı bul
-    const std::map<std::string, float> &rates = be.getDataMap();
-    if (rates.empty()) {
-        std::cerr << "Error: csv is empty or unreadable." << std::endl;
-        continue;
-    }
-
-    std::map<std::string, float>::const_iterator it = rates.lower_bound(date);
-
-    if (it == rates.end()) {
-        // girilen tarih map'teki en büyük tarihten büyükse son elemanı kullan
-        --it;
-    } else if (it->first != date) {
-        // tam eşleşmediyse bir önceki (daha küçük) tarihi kullan
-        if (it == rates.begin()) {
-            std::cerr << "Error: no earlier rate for " << date << std::endl;
-            continue;
-        }
-        --it;
-    }
-
-    double result = value * it->second;
-    std::cout << date << " => " << value << " = " << result << std::endl;
-}
-
-		return (0);
-	}
-	catch (const std::exception &e)
-	{
-		std::cerr << e.what() << std::endl;
-		return (1);
-	}
 }

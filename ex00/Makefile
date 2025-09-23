@@ -1,6 +1,6 @@
 NAME    = btc
 CXX     = c++
-# CXXFLAGS= -Wall -Wextra -Werror -std=c++17 -Iinclude
+CXXFLAGS= -Wall -Wextra -Werror -std=c++17 -Iinclude
 RM      = rm -f
 RMDIR   = rm -rf
 
