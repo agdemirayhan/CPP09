@@ -35,6 +35,16 @@ static void printSeq(const char* prefix, const std::vector<int>& v, size_t maxPr
     std::cout << std::endl;
 }
 
+static void printSeqDeque(const char* prefix, const std::deque<int>& d, size_t maxPrint = 30) {
+    std::cout << prefix;
+    for (size_t i = 0; i < d.size(); ++i) {
+        if (i >= maxPrint) { std::cout << " [...]"; break; }
+        std::cout << (i ? " " : "") << d[i];
+    }
+    std::cout << std::endl;
+}
+
+
 int main(int argc, char** argv) {
     if (argc < 2) { std::cerr << "Error" << std::endl; return 1; }
 
@@ -46,7 +56,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printSeq("Before: ", inputVec);
+    printSeq("Before (vec)\t: ", inputVec);
+
+    printSeqDeque("Before (deque)\t: ", inputDeq);
+
 
     std::vector<int> sortedVec;
     std::deque<int>  sortedDeq;
@@ -54,7 +67,9 @@ int main(int argc, char** argv) {
     long usVec = PmergeMe::sortWithVector(inputVec, sortedVec);
     long usDeq = PmergeMe::sortWithDeque(inputDeq, sortedDeq);
 
-    printSeq("After:  ", sortedVec);
+    printSeq("After (vec)\t: ", sortedVec);
+    printSeqDeque("After  (deque)\t: ", sortedDeq);
+
 
     std::cout << "Time to process a range of " << inputVec.size()
               << " elements with std::vector : " << usVec << " us" << std::endl;

@@ -4,16 +4,8 @@
 #include <utility>
 #include <vector>
 #include <iostream>
-
-static void debugPrint(const char* label, const std::vector<int>& v) {
-    std::cout << label << ": ";
-    for (size_t i = 0; i < v.size(); ++i) {
-        if (i) std::cout << " ";
-        std::cout << v[i];
-    }
-    std::cout << std::endl;
-}
-
+#include <chrono>
+#include <deque>
 
 namespace
 {
@@ -34,9 +26,9 @@ std::vector<size_t> buildJacobsthalOrder(size_t m)
 	{
 		J.push_back(J[J.size() - 1] + 2 * J[J.size() - 2]);
 	}
-	// İlk eleman her zaman 1
+	// The first element is always 1
 	order.push_back(1);
-	// Blokları tersten ekle: (J(k-1)+1 .. min(J(k), m))
+	// Add blocks in reverse: (J(k-1)+1 .. min(J(k), m))
 	for (size_t k = 2; k < J.size(); ++k)
 	{
 		from = J[k - 1] + 1;
@@ -47,10 +39,10 @@ std::vector<size_t> buildJacobsthalOrder(size_t m)
 		{
 			order.push_back(j);
 			if (j == from)
-				break ; // size_t underflow önle
+				break ; // prevent size_t underflow
 		}
 	}
-	// Eksik kaldıysa (nadir) 1..m’yi tamamla (ters tarama ile)
+	// If still incomplete (rare), finish 1..m (reverse scan)
 	if (order.size() < m)
 	{
 		for (size_t j = m; j >= 1; --j)
@@ -72,8 +64,88 @@ std::vector<size_t> buildJacobsthalOrder(size_t m)
 	}
 	return (order);
 }
-} // namespace
+} 
 
+// --- Step 1 (deque): pairing + straggler detection ---
+namespace {
+    void fj_pair_phase_deque(const std::deque<int>& in,
+                             std::vector< std::pair<int,int> >& pairs,
+                             bool& hasStraggler,
+                             int&  stragglerValue)
+    {
+        pairs.clear();
+        hasStraggler   = false;
+        stragglerValue = 0;
+
+        const size_t n = in.size();
+        pairs.reserve(n / 2);
+
+        size_t i = 0;
+        for (; i + 1 < n; i += 2) {
+            int a = in[i];
+            int b = in[i + 1];
+            if (a >= b) pairs.push_back(std::make_pair(a, b)); // (big, small)
+            else        pairs.push_back(std::make_pair(b, a));
+        }
+        if (i < n) {
+            hasStraggler   = true;
+            stragglerValue = in[i];
+        }
+    }
+}
+
+// --- Step 3 (deque): insert small up to its big using binary search ---
+namespace {
+    inline void insertSmallBeforeBig(std::deque<int>& chain, int small, int big) {
+        std::deque<int>::iterator limit = std::lower_bound(chain.begin(), chain.end(), big);
+        std::deque<int>::iterator pos   = std::lower_bound(chain.begin(), limit, small);
+        chain.insert(pos, small);
+    }
+}
+
+namespace {
+    void fj_build_backbone_deque(const std::vector< std::pair<int,int> >& pairs,
+                                 std::deque<int>& backbone)
+    {
+        const size_t m = pairs.size();
+        if (m == 0) { backbone.clear(); return; }
+        if (m == 1) { backbone.clear(); backbone.push_back(pairs[0].first); return; }
+
+        // 1) extract bigs
+        std::deque<int> bigs;
+        for (size_t k = 0; k < m; ++k) bigs.push_back(pairs[k].first);
+
+        // 2) re-pair bigs
+        std::vector< std::pair<int,int> > pairs2;
+        bool hasStr = false; int stray = 0;
+        fj_pair_phase_deque(bigs, pairs2, hasStr, stray);
+
+        // 3) recursively build big-of-bigs backbone
+        std::deque<int> bbChild;
+        if (!pairs2.empty()) fj_build_backbone_deque(pairs2, bbChild);
+        else bbChild.clear();
+
+        // 4) insert pairs2's smalls in Jacobsthal order
+        std::deque<int> chain = bbChild;
+        std::vector<size_t> order = buildJacobsthalOrder(pairs2.size());
+        for (size_t t = 0; t < order.size(); ++t) {
+            size_t idx = order[t] - 1;
+            int big   = pairs2[idx].first;
+            int small = pairs2[idx].second;
+            std::deque<int>::iterator limit = std::lower_bound(chain.begin(), chain.end(), big);
+            std::deque<int>::iterator pos   = std::lower_bound(chain.begin(), limit, small);
+            chain.insert(pos, small);
+        }
+
+        // 5) if there is a stray big, insert it
+        if (hasStr) {
+            std::deque<int>::iterator it = std::lower_bound(chain.begin(), chain.end(), stray);
+            chain.insert(it, stray);
+        }
+
+        backbone.swap(chain);
+    }
+}
 
 namespace
 {
@@ -85,7 +157,7 @@ inline void	insertSmallBeforeBig(std::vector<int> &chain, int small, int big)
 			small);
 	chain.insert(pos, small);
 }
-} // namespace
+} 
 
 namespace {
     void fj_pair_phase_vector(const std::vector<int>& in,
@@ -107,7 +179,7 @@ namespace {
             if (a >= b) pairs.push_back(std::make_pair(a, b)); // (big, small)
             else        pairs.push_back(std::make_pair(b, a));
         }
-        if (i < n) { // tek artan
+        if (i < n) { // single leftover (straggler)
             hasStraggler   = true;
             stragglerValue = in[i];
         }
@@ -121,7 +193,6 @@ namespace {
 }
 
 namespace {
-    // Girdi: (big,small) listesi; Çıktı: big’lerin TAM sıralı backbone’u
     void fj_build_backbone_vector(const std::vector< std::pair<int,int> >& pairs,
                                   std::vector<int>& backbone)
     {
@@ -129,98 +200,109 @@ namespace {
         if (m == 0) { backbone.clear(); return; }
         if (m == 1) { backbone.assign(1, pairs[0].first); return; }
 
-        // 1) bigs dizisini çıkar
+        // 1) extract bigs
         std::vector<int> bigs; bigs.reserve(m);
         for (size_t k = 0; k < m; ++k) bigs.push_back(pairs[k].first);
 
-        // 2) bigs’i pairle
+        // 2) re-pair bigs
         std::vector< std::pair<int,int> > pairs2;
         bool hasStr = false; int stray = 0;
-        fj_pair_phase_vector(bigs, pairs2, hasStr, stray); // (BigOfBig, SmallOfBig)
+        fj_pair_phase_vector(bigs, pairs2, hasStr, stray);
 
-        // 3) pairs2’nin big’lerinden çocuk backbone’u özyinelemeyle üret
+        // 3) recursively build big-of-bigs backbone
         std::vector<int> bbChild;
-        if (!pairs2.empty())
-            fj_build_backbone_vector(pairs2, bbChild);
-        else
-            bbChild.clear();
+        if (!pairs2.empty()) fj_build_backbone_vector(pairs2, bbChild);
+        else bbChild.clear();
 
-        // 4) Çocuk backbone üzerine pairs2’nin SMALL’larını Jacobsthal sırasıyla ekle
+        // 4) insert pairs2's smalls in Jacobsthal order
         std::vector<int> chain = bbChild;
-        const size_t m2 = pairs2.size();
-        std::vector<size_t> order = buildJacobsthalOrder(m2);
+        std::vector<size_t> order = buildJacobsthalOrder(pairs2.size());
         for (size_t t = 0; t < order.size(); ++t) {
-            size_t idx   = order[t] - 1; // 1-based → 0-based
-            int bigBOB   = pairs2[idx].first;   // bu seviyenin "big of big"
-            int smallBOB = pairs2[idx].second;  // bu seviyenin "small of big"
-
-            // smallBOB’u, bigBOB’un ilk konumuna kadar ikili aramayla yerleştir
-            std::vector<int>::iterator limit = std::lower_bound(chain.begin(), chain.end(), bigBOB);
-            std::vector<int>::iterator pos   = std::lower_bound(chain.begin(), limit, smallBOB);
-            chain.insert(pos, smallBOB);
+            size_t idx = order[t] - 1;                 // 1-based -> 0-based
+            int big   = pairs2[idx].first;
+            int small = pairs2[idx].second;
+            // insert small up to its big
+            std::vector<int>::iterator limit = std::lower_bound(chain.begin(), chain.end(), big);
+            std::vector<int>::iterator pos   = std::lower_bound(chain.begin(), limit, small);
+            chain.insert(pos, small);
         }
 
-        // 5) Eğer bigs tek sayıda ise stray big’i de genel backbone’a ekle
+        // 5) if there is a stray big, insert it
         if (hasStr) {
-            std::vector<int>::iterator pos = std::lower_bound(chain.begin(), chain.end(), stray);
-            chain.insert(pos, stray);
+            std::vector<int>::iterator it = std::lower_bound(chain.begin(), chain.end(), stray);
+            chain.insert(it, stray);
         }
-
-        // 6) Sonuç: tüm BIG’lerden oluşan sıralı backbone
         backbone.swap(chain);
-
-        // (Opsiyonel debug)
-        // debugPrint("[DEBUG] Backbone built", backbone);
     }
 }
 
-
-
 long PmergeMe::sortWithVector(const std::vector<int>& input, std::vector<int>& output) {
-    // Adım 1: pairleme
+    auto t0 = std::chrono::steady_clock::now();
+    // Step 1: pairing
     std::vector< std::pair<int,int> > pairs;
     bool hasStraggler = false;
     int  stragglerVal = 0;
     fj_pair_phase_vector(input, pairs, hasStraggler, stragglerVal);
 
-    // Adım 2: backbone (sıralı big’ler)
+    // Step 2: backbone (sorted bigs)
     std::vector<int> backbone;
     fj_build_backbone_vector(pairs, backbone);
 
-    // Adım 3: small’ları Jacobsthal sırasıyla backbone’a ekle (kendi big’ini aşmadan)
-    std::vector<int> chain = backbone;                 // üzerine ekleyeceğimiz ana zincir
+    // Step 3: insert smalls into the backbone in Jacobsthal order
+    std::vector<int> chain = backbone;
     const size_t m = pairs.size();
     std::vector<size_t> order = buildJacobsthalOrder(m);
-    std::cout << "[DEBUG] Jacobsthal order: ";
-    for (size_t k = 0; k < order.size(); ++k)
-        std::cout << order[k] << " ";
-    std::cout << std::endl;
-
     for (size_t t = 0; t < order.size(); ++t) {
-        size_t idx = order[t] - 1;                    // 1-based → 0-based
+        size_t idx = order[t] - 1;
         int big   = pairs[idx].first;
         int small = pairs[idx].second;
         insertSmallBeforeBig(chain, small, big);
-        std::cout << "[DEBUG] Insert small=" << small 
-          << " before big=" << big << std::endl;
-        debugPrint("   chain now", chain);
     }
-    
-    std::vector<int> dbg_bigs;
-    dbg_bigs.reserve(pairs.size());
-    for (size_t i = 0; i < pairs.size(); ++i) dbg_bigs.push_back(pairs[i].first);
-    debugPrint("[DEBUG] bigs", dbg_bigs);
 
-    // !!! DİKKAT: Straggler henüz eklenmedi. Bir sonraki adımda ekleyeceğiz.
-    // Şimdilik kullanıcı çıktısını bozmayalım:
-    output = input; // geçici
-    return 0;       // süre ölçümü sonraki aşamada eklenecek
+    // Step 4: if there is a straggler, insert it
+    if (hasStraggler) {
+        std::vector<int>::iterator pos =
+            std::lower_bound(chain.begin(), chain.end(), stragglerVal);
+        chain.insert(pos, stragglerVal);
+    }
+
+    // return the result
+    output.swap(chain);
+    auto t1 = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 }
 
+long PmergeMe::sortWithDeque(const std::deque<int>& input, std::deque<int>& output) {
+    auto t0 = std::chrono::steady_clock::now();
+    // Step 1: pairing
+    std::vector< std::pair<int,int> > pairs;
+    bool hasStraggler = false;
+    int  stragglerVal = 0;
+    fj_pair_phase_deque(input, pairs, hasStraggler, stragglerVal);
 
-long PmergeMe::sortWithDeque(const std::deque<int> &input,
-	std::deque<int> &output)
-{
-	output = input;
-	return (0);
+    // Step 2: backbone (sorted bigs)
+    std::deque<int> backbone;
+    fj_build_backbone_deque(pairs, backbone);
+
+    // Step 3: insert smalls into the backbone in Jacobsthal order
+    std::deque<int> chain = backbone;
+    const size_t m = pairs.size();
+    std::vector<size_t> order = buildJacobsthalOrder(m);
+    for (size_t t = 0; t < order.size(); ++t) {
+        size_t idx = order[t] - 1;     // 1-based -> 0-based
+        int big   = pairs[idx].first;
+        int small = pairs[idx].second;
+        insertSmallBeforeBig(chain, small, big); // deque overload
+    }
+
+    // Step 4: if there is a straggler, insert it
+    if (hasStraggler) {
+        std::deque<int>::iterator pos =
+            std::lower_bound(chain.begin(), chain.end(), stragglerVal);
+        chain.insert(pos, stragglerVal);
+    }
+
+    output.swap(chain);
+    auto t1 = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 }
