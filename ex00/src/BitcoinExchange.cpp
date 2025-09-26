@@ -1,11 +1,39 @@
-#include "BitcoinExchange.hpp"
-#include <cctype>
-#include <cstdlib>
+#include "../include/BitcoinExchange.hpp"
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
-#include <string>
+#include <cctype>
+#include <cstdlib>
+
+// ---- OCF ----
+BitcoinExchange::BitcoinExchange() : _dataMap(), _csvPath() {
+    // Intentionally empty; user can call loadCsv later if desired.
+}
+
+BitcoinExchange::BitcoinExchange(const BitcoinExchange& other)
+: _dataMap(other._dataMap), _csvPath(other._csvPath) {}
+
+BitcoinExchange& BitcoinExchange::operator=(const BitcoinExchange& other) {
+    if (this != &other) {
+        _dataMap  = other._dataMap;
+        _csvPath  = other._csvPath;
+    }
+    return *this;
+}
+
+BitcoinExchange::~BitcoinExchange() {}
+
+// ---- existing ctor ----
+BitcoinExchange::BitcoinExchange(const std::string& csvPath)
+: _dataMap(), _csvPath(csvPath)
+{
+    loadCsv(csvPath);
+}
+
+// ---- getters ----
+const std::string& BitcoinExchange::getCsvPath() const { return _csvPath; }
+const std::map<std::string, float>& BitcoinExchange::getDataMap() const { return _dataMap; }
+
 
 // ---------- small helpers ----------
 static std::string trim(const std::string& s) {
@@ -29,17 +57,6 @@ static bool safeParseFloat(const std::string& s, float& out) {
     } catch (...) {
         return false;
     }
-}
-
-// ---------- public API ----------
-const std::string& BitcoinExchange::getCsvPath() const {
-    return _csvPath;
-}
-
-BitcoinExchange::BitcoinExchange(const std::string& csvPath)
-: _csvPath(csvPath) // keep a copy if you expose getCsvPath()
-{
-    loadCsv(csvPath);
 }
 
 // Load the historical BTC rates from a CSV file (format: "date,rate").
@@ -67,16 +84,14 @@ void BitcoinExchange::loadCsv(const std::string& csvPath)
         // Split on ','
         std::size_t comma = line.find(',');
         if (comma == std::string::npos) {
-            // Malformed line: no comma. Skip silently or log if you prefer.
+            // Malformed line: no comma. Skip silently
             continue;
         }
 
         std::string key      = trim(line.substr(0, comma));       // date string
         std::string valueStr = trim(line.substr(comma + 1));      // rate string
 
-        // Optional: validate date format early (prevents bad keys in the map)
         if (!isValidDate(key)) {
-            // If you prefer to be silent, replace with "continue;"
             std::cerr << "Warning: invalid date in CSV => " << key << std::endl;
             continue;
         }

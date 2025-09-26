@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-// ---------- trimming helpers (C++17 string_view) ----------
+// ---------- trimming helpers ----------
 static std::string_view ltrim(std::string_view sv) {
     auto it = std::find_if_not(sv.begin(), sv.end(),
         [](unsigned char c){ return std::isspace(c); });

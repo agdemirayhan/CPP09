@@ -3,7 +3,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <cctype>
-#include <iostream>
 
 RPN::RPN() {}
 RPN::RPN(const RPN&) {}
