@@ -7,6 +7,14 @@
 #include <chrono>
 #include <deque>
 
+#include "PmergeMe.hpp"
+
+PmergeMe::PmergeMe() {}
+PmergeMe::PmergeMe(const PmergeMe& other) { (void)other; }
+PmergeMe& PmergeMe::operator=(const PmergeMe& rhs) { (void)rhs; return *this; }
+PmergeMe::~PmergeMe() {}
+
+
 namespace
 {
 std::vector<size_t> buildJacobsthalOrder(size_t m)
@@ -183,12 +191,13 @@ namespace {
             hasStraggler   = true;
             stragglerValue = in[i];
         }
-        std::cout << "[DEBUG] Pairs (big,small): ";
-        for (size_t k = 0; k < pairs.size(); ++k) {
-            std::cout << "(" << pairs[k].first << "," << pairs[k].second << ") ";
-        }
-        if (hasStraggler) std::cout << " stray=" << stragglerValue;
-        std::cout << std::endl;
+        // DEBUG
+        // std::cout << "[DEBUG] Pairs (big,small): ";
+        // for (size_t k = 0; k < pairs.size(); ++k) {
+        //     std::cout << "(" << pairs[k].first << "," << pairs[k].second << ") ";
+        // }
+        // if (hasStraggler) std::cout << " stray=" << stragglerValue;
+        // std::cout << std::endl;
     }
 }
 
@@ -218,7 +227,7 @@ namespace {
         std::vector<int> chain = bbChild;
         std::vector<size_t> order = buildJacobsthalOrder(pairs2.size());
         for (size_t t = 0; t < order.size(); ++t) {
-            size_t idx = order[t] - 1;                 // 1-based -> 0-based
+            size_t idx = order[t] - 1;
             int big   = pairs2[idx].first;
             int small = pairs2[idx].second;
             // insert small up to its big

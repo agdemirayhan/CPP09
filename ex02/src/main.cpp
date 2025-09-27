@@ -12,13 +12,12 @@ static bool parseArgs(int argc, char** argv, std::vector<int>& v, std::deque<int
         for (size_t k = 0; k < s.size(); ++k) {
             if (s[k] < '0' || s[k] > '9') return false;
         }
-        // Pozitif ve INT_MAX sınırı
         unsigned long ul = 0;
         for (size_t k = 0; k < s.size(); ++k) {
             ul = ul * 10 + (s[k] - '0');
             if (ul > static_cast<unsigned long>(INT_MAX)) return false;
         }
-        if (ul == 0) return false; // 0 kabul etmiyoruz (pozitif gerekli)
+        if (ul == 0) return false; 
         int val = static_cast<int>(ul);
         v.push_back(val);
         d.push_back(val);
@@ -35,14 +34,15 @@ static void printSeq(const char* prefix, const std::vector<int>& v, size_t maxPr
     std::cout << std::endl;
 }
 
-static void printSeqDeque(const char* prefix, const std::deque<int>& d, size_t maxPrint = 30) {
-    std::cout << prefix;
-    for (size_t i = 0; i < d.size(); ++i) {
-        if (i >= maxPrint) { std::cout << " [...]"; break; }
-        std::cout << (i ? " " : "") << d[i];
-    }
-    std::cout << std::endl;
-}
+// DEBUG
+// static void printSeqDeque(const char* prefix, const std::deque<int>& d, size_t maxPrint = 30) {
+//     std::cout << prefix;
+//     for (size_t i = 0; i < d.size(); ++i) {
+//         if (i >= maxPrint) { std::cout << " [...]"; break; }
+//         std::cout << (i ? " " : "") << d[i];
+//     }
+//     std::cout << std::endl;
+// }
 
 
 int main(int argc, char** argv) {
@@ -56,10 +56,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printSeq("Before (vec)\t: ", inputVec);
-
-    printSeqDeque("Before (deque)\t: ", inputDeq);
-
+    printSeq("Before \t: ", inputVec);
+    // DEBUG
+    //printSeqDeque("Before (deque)\t: ", inputDeq);
 
     std::vector<int> sortedVec;
     std::deque<int>  sortedDeq;
@@ -67,14 +66,13 @@ int main(int argc, char** argv) {
     long usVec = PmergeMe::sortWithVector(inputVec, sortedVec);
     long usDeq = PmergeMe::sortWithDeque(inputDeq, sortedDeq);
 
-    printSeq("After (vec)\t: ", sortedVec);
-    printSeqDeque("After  (deque)\t: ", sortedDeq);
-
+    printSeq("After \t: ", sortedVec);
+    // DEBUG
+    //printSeqDeque("After (deque)\t: ", sortedDeq);
 
     std::cout << "Time to process a range of " << inputVec.size()
               << " elements with std::vector : " << usVec << " us" << std::endl;
     std::cout << "Time to process a range of " << inputDeq.size()
               << " elements with std::deque  : " << usDeq << " us" << std::endl;
-
     return 0;
 }

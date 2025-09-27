@@ -8,6 +8,10 @@
 #include <string>
 #include <string_view>
 
+#define GREEN "\033[0;32m"
+#define RED "\033[0;31m"
+#define RESET "\033[0m"
+
 // ---------- trimming helpers ----------
 static std::string_view ltrim(std::string_view sv) {
     auto it = std::find_if_not(sv.begin(), sv.end(),
@@ -58,11 +62,11 @@ static bool parseValue(const std::string& valueStr, double& valueOut) {
 
 static bool validateValue(double v) {
     if (v < 0) {
-        std::cerr << "Error: not a positive number." << std::endl;
+        std::cerr << RED <<"Error: not a positive number." << RESET << std::endl;
         return false;
     }
     if (v > 1000) {
-        std::cerr << "Error: too large a number." << std::endl;
+        std::cerr << RED << "Error: too large a number." << RESET << std::endl;
         return false;
     }
     return true;
@@ -72,7 +76,7 @@ static bool findRateForDate(const std::map<std::string,float>& rates,
                             const std::string& date, float& rateOut)
 {
     if (rates.empty()) {
-        std::cerr << "Error: csv is empty or unreadable." << std::endl;
+        std::cerr << RED <<"Error: csv is empty or unreadable." << RESET << std::endl;
         return false;
     }
 
@@ -83,7 +87,7 @@ static bool findRateForDate(const std::map<std::string,float>& rates,
     } else if (it->first != date) {
         // not an exact match -> use previous (<= date)
         if (it == rates.begin()) {
-            std::cerr << "Error: no earlier rate for " << date << std::endl;
+            std::cerr << RED << "Error: no earlier rate for " << date << RESET << std::endl;
             return false;
         }
         --it;
@@ -113,27 +117,27 @@ static void processInputStream(BitcoinExchange& be, std::istream& in)
 
         std::string date, valueStr;
         if (!splitInputLine(line, date, valueStr)) {
-            std::cerr << "Error: bad input => " << line << std::endl;
+            std::cerr << RED << "Error: bad input => " << line << RESET << std::endl;
             continue;
         }
 
         if (!BitcoinExchange::isValidDate(date)) {
-            std::cerr << "Error: bad input => " << date << std::endl;
+            std::cerr << RED << "Error: bad input => " << date << RESET << std::endl;
             continue;
         }
 
         double value = 0.0;
         if (!parseValue(valueStr, value)) {
-            std::cerr << "Error: bad value => " << valueStr << std::endl;
+            std::cerr << RED << "Error: bad value => " << valueStr << RESET << std::endl;
             continue;
         }
-        if (!validateValue(value)) continue;
+        if (!validateValue(value)) continue;    
 
         float rate = 0.0f;
         if (!findRateForDate(rates, date, rate)) continue;
 
         double result = value * rate;
-        std::cout << date << " => " << value << " = " << result << std::endl;
+        std::cout << GREEN << date << " => " << value << " = " << result << RESET << std::endl;
     }
 }
 
@@ -141,16 +145,16 @@ static void processInputStream(BitcoinExchange& be, std::istream& in)
 int main(int argc, char** argv)
 {
     if (argc != 2) {
-        std::cerr << "Error: could not open file." << std::endl;
+        std::cerr << RED << "Error: could not open file." << RESET << std::endl;
         return 1;
     }
 
     try {
-        BitcoinExchange be("data/data.csv");
+        BitcoinExchange be("data.csv");
 
         std::ifstream in(argv[1]);
         if (!in) {
-            std::cerr << "Error: could not open file." << std::endl;
+            std::cerr << "Error: could not open file." << RESET << std::endl;
             return 1;
         }
 

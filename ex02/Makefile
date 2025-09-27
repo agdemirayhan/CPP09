@@ -1,7 +1,7 @@
 NAME := PmergeMe
 
 CXX := c++
-CXXFLAGS := -Wall -Wextra -Werror -std=c++17 -Iinclude
+CXXFLAGS := -Wall -Wextra -Werror -std=c++17 -Iinclude 
 
 SRC_DIR := src
 INC_DIR := include
@@ -33,5 +33,3 @@ fclean: clean
 re: fclean all
 
 .PHONY: all clean fclean re
-
-

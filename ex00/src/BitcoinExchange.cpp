@@ -5,6 +5,10 @@
 #include <cctype>
 #include <cstdlib>
 
+#define GREEN "\033[0;32m"
+#define RED "\033[0;31m"
+#define RESET "\033[0m"
+
 // ---- OCF ----
 BitcoinExchange::BitcoinExchange() : _dataMap(), _csvPath() {
     // Intentionally empty; user can call loadCsv later if desired.
@@ -92,13 +96,13 @@ void BitcoinExchange::loadCsv(const std::string& csvPath)
         std::string valueStr = trim(line.substr(comma + 1));      // rate string
 
         if (!isValidDate(key)) {
-            std::cerr << "Warning: invalid date in CSV => " << key << std::endl;
+            std::cerr << RED << "Warning: invalid date in CSV => " << key << RESET << std::endl;
             continue;
         }
 
         float value = 0.0f;
         if (!safeParseFloat(valueStr, value)) {
-            std::cerr << "Error: invalid rate in CSV => " << valueStr << std::endl;
+            std::cerr << RED << "Error: invalid rate in CSV => " << valueStr << RESET << std::endl;
             continue;
         }
 
